@@ -1,6 +1,6 @@
 # clojure-lsp Development
 
-## Codebase architecture 
+## Codebase architecture
 
 The codebase is dense but well structured, the diagram below will help understand the layers making easier to understand where you need to make your changes.
 
@@ -161,7 +161,7 @@ These are the steps:
 
 **Seeing is believing.** An easy way to convince yourself that you can actually change clojure-lsp mid-flight is to:
 
-1. Modify the `server-info` function in `src/clojure_lsp/handlers.clj`
+1. Modify the `server-info` function in [clojure_lsp/feature/development_info.clj](/lib/src/clojure_lsp/feature/development_info.clj)
     - Say, you add a `:foo :bar` entry to the map returned
 1. Evaluate the new `server-info` function definition
 1. Issue the clojure-lsp `serverInfo` command
@@ -175,8 +175,8 @@ The details in how to perform these steps can vary a bit between the various Clo
 
 * This project comes with [Calva](https://calva.io) configuration to use the `clojure-lsp[.bat]` executable built in step 1 above. You can skip step 2, unless are running on MS-Widnows, in which case you should update the setting in `.vscode/settings.json` to add the `.bat` extension, i.e. `"calva.clojureLspPath": "./clojure-lsp.bat"`.
 
-* To restart the clojure-lsp server, use the VS Code command **Developer: Reload Window**
-* The **Hack away!** step needs to start with you issuing the command **Calva: Load Current File and Dependencies**.
+* To restart the clojure-lsp server, use the VS Code command **Developer: Restart Extension Host**
+* The **Hack away!** step needs to start with you issuing the command **Calva: Load/Evaluate Current File and its Requires/Dependencies**.
 
 #### Emacs with CIDER
 
