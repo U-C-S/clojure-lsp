@@ -1,7 +1,6 @@
 (ns clojure-lsp.feature.diagnostics.built-in
   (:require
    [clj-kondo.impl.config :as kondo.config]
-   [clojure-lsp.logger :as logger]
    [clojure-lsp.parser :as parser]
    [clojure-lsp.queries :as q]
    [clojure-lsp.refactor.edit :as edit]
@@ -11,7 +10,6 @@
    [clojure.string :as string]
    [rewrite-clj.zip :as z]))
 
-(rewrite-clj.zip/append-child nil nil)
 (defn ^:private ignore-diag? [diagnostic ignores]
   (let [diag-range {:name-row (-> diagnostic :range :start :line inc)
                     :name-col (-> diagnostic :range :start :character inc)
@@ -216,60 +214,6 @@
                            (format "Unused public var '%s/%s'" (:ns element) (:name element)))
                          [1])))))))))
 
-;; (defn fully-qualified-ns-fn [narrowed-db project-db settings]
-;;   ;; (ns a (:require [clojure.walk])
-;;   ;; (clojure.walk/walk identity identity {:a 1})
-;;   ;; (clojure.walk/walk identity identity {:b 2})
-
-;;   ;; have an action to convert this to:
-
-;;   ;; (ns a (:require [clojure.walk :as walk]))
-;;   ;; (walk/walk identity identity {:a 1})
-;;   ;; (walk/walk identity identity {:b 2})
-
-;;   ;; For this, create a lint which identifies all such fully qualified namespaces
-;;   ;; fn calls (excluding aliased fn calls) and marks them as warn
-;;   )
-
-(defn fully-qualified-ns-fn
-  "Find the usages of fully qualified namespace function calls (e.g. clojure.walk/walk)
-   where the namespace is required but not aliased, and generate diagnostics."
-  [narrowed-db project-db settings]
-  (let [level (get-in settings [:linters :clojure-lsp/fully-qualified-ns-fn :level] :warn)]
-    (when-not (identical? :off level)
-      (let [analysis (:analysis project-db)
-            _ (logger/warn "helppppppppppp")
-            ;; Find all namespace definitions in the current analysis
-            ns-defs (mapcat #(q/find-namespace-definitions narrowed-db %) (keys analysis))
-            ;; Build a map of required namespaces and their aliases for each ns
-            ns-requires (into {}
-                              (map (fn [ns-def]
-                                     [(:name ns-def)
-                                      (set (map (fn [req]
-                                                  {:ns (:to req)
-                                                   :alias (:alias req)})
-                                                (:require ns-def)))])
-                                   ns-defs))
-            ;; Find all function calls in the analysis
-            fn-calls (mapcat #(get-in % [:var-usages]) (vals analysis))]
-        (->> fn-calls
-             (filter (fn [{:keys [name ns uri]}]
-                       (and ns
-                            ;; Only consider calls where ns is not aliased in the current file
-                            (let [ns-aliases (get ns-requires (:ns (q/find-namespace-definitions narrowed-db uri)))]
-                              (and
-                                ;; The namespace is required but not aliased
-                                (some #(= ns (:ns %)) ns-aliases)
-                                (not-any? #(and (= ns (:ns %)) (:alias %)) ns-aliases))))))
-             (map (fn [element]
-                    (element->diagnostic
-                      element
-                      level
-                      "clojure-lsp/fully-qualified-ns-fn"
-                      (format "Function '%s/%s' is called using a fully qualified namespace. Consider adding an alias to '%s' in the ns require and using the alias instead."
-                              (:ns element) (:name element) (:ns element))
-                      nil))))))))
-
 (defn ^:private find-dependency-cycles
   "Detects cycles in the namespace dependency graph using DFS with colors.
    Returns a sequence of cycle paths, where each path is a vector of namespaces forming a cycle."
@@ -340,7 +284,7 @@
                                   (format "Cyclic dependency detected: %s" cycle-path)
                                   nil))]
         (distinct cycle-diagnostics)))))
-(def x "moe")
+
 (defn analyze-uris! [uris db]
   (shared/logging-task
     :internal/built-in-linters
@@ -354,9 +298,6 @@
           unused* (future (shared/logging-task
                             :internal/built-in-linters.unused-public-vars
                             (unused-public-vars db-of-uris project-db settings)))
-          fully-qualified* (future (shared/logging-task
-                                     :internal/built-in-linters.fully-qualified-ns-fn
-                                     (fully-qualified-ns-fn db-of-uris project-db settings)))
           different* (future (shared/logging-task
                                :internal/built-in-linters.different-aliases
                                (different-aliases db-of-uris project-db settings)))
@@ -364,7 +305,7 @@
                             :internal/built-in-linters.cyclic-dependencies
                             (cyclic-dependencies db-of-uris project-db settings)))
           all-diags (remove #(ignore-diag? % @ignores*)
-                            (concat @unused* @fully-qualified* @different* @cyclic*))]
+                            (concat @unused* @different* @cyclic*))]
       (merge empty-diags
              (reduce
                (fn [acc diag]

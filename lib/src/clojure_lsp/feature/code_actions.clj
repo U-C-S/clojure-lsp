@@ -17,10 +17,7 @@
    [clojure-lsp.shared :as shared]
    [clojure.string :as string]
    [medley.core :as medley]
-   [rewrite-clj.zip :as z]
-   [clojure-lsp.logger :as logger]))
-
-;; (medley.core/abs nil)
+   [rewrite-clj.zip :as z]))
 
 (set! *warn-on-reflection* true)
 
@@ -372,11 +369,6 @@
              :command   "get-in-none"
              :arguments [uri line character]}})
 
-(defn print-everything
-  [zloc uri]
-  ;; (logger/debug zloc (str "---------" uri))
-  nil)
-
 (defn all [root-zloc uri row col diagnostics client-capabilities db]
   (let [zloc (parser/to-pos root-zloc row col)
         line (dec row)
@@ -394,7 +386,6 @@
         can-create-test?* (future (r.transform/can-create-test? zloc uri db))
         macro-sym* (future (f.resolve-macro/find-full-macro-symbol-to-resolve zloc uri db))
         resolvable-require-diagnostics (diagnostics-with-code #{"unresolved-namespace" "unresolved-symbol" "syntax"} resolvable-diagnostics)
-        fully-qualified-ns-fn? (future (print-everything zloc uri))
         resolvable-refer-all-diagnostics (diagnostics-with-code #{"refer-all"} resolvable-diagnostics)
         missing-requires* (future (find-missing-requires resolvable-require-diagnostics uri db))
         missing-imports* (future (find-missing-imports resolvable-require-diagnostics db))
