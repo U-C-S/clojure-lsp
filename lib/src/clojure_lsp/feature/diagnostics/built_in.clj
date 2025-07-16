@@ -232,34 +232,35 @@
 ;;   )
 
 (defn fully-qualified-ns-fn
-  "Find usages of fully qualified namespace function calls (e.g. clojure.walk/walk)
+  "Find the usages of fully qualified namespace function calls (e.g. clojure.walk/walk)
    where the namespace is required but not aliased, and generate diagnostics."
   [narrowed-db project-db settings]
   (let [level (get-in settings [:linters :clojure-lsp/fully-qualified-ns-fn :level] :warn)]
     (when-not (identical? :off level)
-      (let [analysis (:analysis narrowed-db)
-            ;; For each URI, get its ns definition and required namespaces
-            ns-info-by-uri
-            (into {}
-                  (map (fn [[uri buckets]]
-                         (let [ns-def (first (get buckets :namespace-definitions))
-                               requires (set (map (fn [req]
-                                                    {:ns (:to req)
-                                                     :alias (:alias req)})
-                                                  (:require ns-def)))]
-                           [uri {:ns-def ns-def :requires requires}])))
-                  analysis)
+      (let [analysis (:analysis project-db)
+            _ (logger/warn "helppppppppppp")
+            ;; Find all namespace definitions in the current analysis
+            ns-defs (mapcat #(q/find-namespace-definitions narrowed-db %) (keys analysis))
+            ;; Build a map of required namespaces and their aliases for each ns
+            ns-requires (into {}
+                              (map (fn [ns-def]
+                                     [(:name ns-def)
+                                      (set (map (fn [req]
+                                                  {:ns (:to req)
+                                                   :alias (:alias req)})
+                                                (:require ns-def)))])
+                                   ns-defs))
             ;; Find all function calls in the analysis
             fn-calls (mapcat #(get-in % [:var-usages]) (vals analysis))]
         (->> fn-calls
-             (filter (fn [{:keys [ns uri]}]
-                       (when (and ns uri)
-                         (let [{:keys [requires]} (get ns-info-by-uri uri)]
-                           (and
-                             ;; The namespace is required
-                             (some #(= ns (:ns %)) requires)
-                             ;; The namespace is not aliased
-                             (not-any? #(and (= ns (:ns %)) (:alias %)) requires))))))
+             (filter (fn [{:keys [name ns uri]}]
+                       (and ns
+                            ;; Only consider calls where ns is not aliased in the current file
+                            (let [ns-aliases (get ns-requires (:ns (q/find-namespace-definitions narrowed-db uri)))]
+                              (and
+                                ;; The namespace is required but not aliased
+                                (some #(= ns (:ns %)) ns-aliases)
+                                (not-any? #(and (= ns (:ns %)) (:alias %)) ns-aliases))))))
              (map (fn [element]
                     (element->diagnostic
                       element
